@@ -6,7 +6,7 @@ import {
   computeStats,
   type Prediction,
 } from "@/lib/walrus";
-import { buildRoastSystemPrompt, buildRoastUserPrompt } from "@/lib/roast";
+import { buildRoastSystemPrompt, buildRoastUserPrompt, rememberPrediction, recallPredictions } from "@/lib/roast";
 import { readRegistry, writeRegistry } from "@/lib/walrus";
 
 async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
@@ -65,11 +65,22 @@ export async function POST(req: NextRequest) {
     };
 
     try {
-      const text = await callGemini(buildRoastSystemPrompt(), buildRoastUserPrompt(memory, newPred));
+      // Recall past memories from MemWal
+      const pastMemories = await recallPredictions(userId);
+      console.log("MemWal past memories:", pastMemories);
+
+      const text = await callGemini(
+        buildRoastSystemPrompt(),
+        buildRoastUserPrompt(memory, pastMemories, newPred)
+      );
       console.log("Gemini raw response:", text);
       roastData = JSON.parse(text);
+
+      // Store this prediction + roast in MemWal
+      await rememberPrediction(userId, newPred, roastData.roast);
+      console.log("MemWal memory stored successfully");
     } catch (e) {
-      console.error("Roast generation error:", e);
+      console.error("Roast/memory error:", e);
     }
 
     memory.roasts.push({
@@ -92,7 +103,6 @@ export async function POST(req: NextRequest) {
       if (!registry.blobIds.includes(newBlobId)) {
         registry.blobIds.push(newBlobId);
         const newRegistryBlobId = await writeRegistry(registry);
-        // Return new registry blob ID so client can store it
         return NextResponse.json({
           blobId: newBlobId,
           registryBlobId: newRegistryBlobId,
@@ -105,7 +115,7 @@ export async function POST(req: NextRequest) {
       console.error("Registry update error:", e);
     }
 
-    return NextResponse.json({ blobId: newBlobId, prediction: newPred, roast: roastData, memory })
+    return NextResponse.json({ blobId: newBlobId, prediction: newPred, roast: roastData, memory });
   } catch (err: any) {
     console.error("Predict API error:", err);
     return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });

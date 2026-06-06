@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@mysten-incubation/memwal": "^0.0.7",
     "@mysten/dapp-kit": "^0.14.0",
     "@mysten/sui": "^2.17.0",
     "@mysten/walrus": "^1.1.7",
