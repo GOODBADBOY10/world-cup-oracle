@@ -11,7 +11,7 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
       body: JSON.stringify({
         contents: [{ parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }],
         generationConfig: {
-          maxOutputTokens: 1024,
+          maxOutputTokens: 2048,
           responseMimeType: "application/json",
         },
       }),

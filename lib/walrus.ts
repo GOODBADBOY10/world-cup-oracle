@@ -1,5 +1,5 @@
-export const WALRUS_PUBLISHER = "https://publisher.walrus-testnet.walrus.space";
-export const WALRUS_AGGREGATOR = "https://aggregator.walrus-testnet.walrus.space";
+export const WALRUS_AGGREGATOR = "https://aggregator.walrus-mainnet.walrus.space";
+export const WALRUS_TESTNET_PUBLISHER = "https://publisher.walrus-testnet.walrus.space";
 export const REGISTRY_BLOB_KEY = "oracle_registry_blobId";
 
 export interface Prediction {
@@ -91,34 +91,119 @@ export function computeStats(memory: UserMemory): UserMemory["stats"] {
   return { total: memory.predictions.length, correct: correct.length, streak, bestStreak: best, mostWrongTeam, avgConfidence };
 }
 
-export async function writeMemoryToWalrus(memory: UserMemory): Promise<string> {
-  const json = JSON.stringify({ ...memory, updatedAt: new Date().toISOString() });
+// async function writeToMainnet(json: string): Promise<string> {
+//   const privateKey = process.env.SUI_PRIVATE_KEY;
+//   if (!privateKey) throw new Error("No SUI_PRIVATE_KEY");
 
-  const res = await fetch(`${WALRUS_PUBLISHER}/v1/blobs?epochs=5`, {
+//   const { Ed25519Keypair } = await import("@mysten/sui/keypairs/ed25519");
+//   const { SuiClient } = await import("@mysten/sui/client");
+//   const { WalrusClient } = await import("@mysten/walrus");
+
+//   const keypair = Ed25519Keypair.fromSecretKey(privateKey);
+//   const suiClient = new SuiClient({ url: "https://fullnode.mainnet.sui.io:443" });
+
+//   const walrusClient = new WalrusClient({
+//     network: "mainnet",
+//     suiClient,
+//     uploadRelayUrl: "https://upload-relay.mainnet.walrus.space",
+//   });
+
+//   const blob = new TextEncoder().encode(json);
+//   const result = await walrusClient.writeBlob({
+//     blob,
+//     deletable: true,
+//     epochs: 5,
+//     signer: keypair,
+//   });
+
+//   return result.blobId;
+// }
+
+async function writeToMainnet(json: string): Promise<string> {
+  const privateKey = process.env.SUI_PRIVATE_KEY;
+  if (!privateKey) throw new Error("No SUI_PRIVATE_KEY");
+
+  const { Ed25519Keypair } = await import("@mysten/sui/keypairs/ed25519");
+  const { SuiGrpcClient } = await import("@mysten/sui/grpc");
+  const { walrus } = await import("@mysten/walrus");
+
+  const keypair = Ed25519Keypair.fromSecretKey(privateKey);
+
+  const client = new SuiGrpcClient({
+    network: "mainnet",
+    baseUrl: "https://fullnode.mainnet.sui.io:443",
+  }).$extend(
+    walrus({
+      uploadRelay: {
+        host: "https://upload-relay.mainnet.walrus.space",
+        sendTip: { max: 5_000_000 },
+      },
+    })
+  );
+
+  const blob = new TextEncoder().encode(json);
+  const result = await client.walrus.writeBlob({
+    blob,
+    deletable: true,
+    epochs: 3,
+    signer: keypair,
+  });
+
+  return result.blobId;
+}
+
+async function writeToTestnet(json: string): Promise<string> {
+  const res = await fetch(`${WALRUS_TESTNET_PUBLISHER}/v1/blobs?epochs=5`, {
     method: "PUT",
     body: json,
     headers: { "Content-Type": "application/json" },
   });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Walrus write failed: ${res.status} ${errText}`);
-  }
-
+  if (!res.ok) throw new Error(`Testnet write failed: ${res.status}`);
   const data = await res.json();
   const blobId =
     data?.newlyCreated?.blobObject?.blobId ||
     data?.alreadyCertified?.blobId ||
     data?.blobId;
-
-  if (!blobId) throw new Error("No blobId returned: " + JSON.stringify(data));
+  if (!blobId) throw new Error("No blobId: " + JSON.stringify(data));
   return blobId;
 }
 
+export async function writeMemoryToWalrus(memory: UserMemory): Promise<string> {
+  const json = JSON.stringify({ ...memory, updatedAt: new Date().toISOString() });
+
+  if (process.env.SUI_PRIVATE_KEY) {
+    try {
+      console.log("Attempting mainnet write...");
+      const blobId = await writeToMainnet(json);
+      console.log("Mainnet write success:", blobId);
+      return blobId;
+    } catch (e) {
+      console.error("Mainnet write failed, falling back to testnet:", e);
+    }
+  }
+
+  return writeToTestnet(json);
+}
+
+// export async function readMemoryFromWalrus(blobId: string): Promise<UserMemory> {
+//   const res = await fetch(`${WALRUS_AGGREGATOR}/v1/blobs/${blobId}`);
+//   if (!res.ok) throw new Error(`Walrus read failed: ${res.status}`);
+//   return res.json();
+// }
+
 export async function readMemoryFromWalrus(blobId: string): Promise<UserMemory> {
+  // Try mainnet first
   const res = await fetch(`${WALRUS_AGGREGATOR}/v1/blobs/${blobId}`);
-  if (!res.ok) throw new Error(`Walrus read failed: ${res.status}`);
-  return res.json();
+  if (res.ok) return res.json();
+
+  // Fall back to testnet aggregator for old blobs
+  const testnetRes = await fetch(
+    `https://aggregator.walrus-testnet.walrus.space/v1/blobs/${blobId}`
+  );
+  if (testnetRes.ok) return testnetRes.json();
+
+  throw new Error(`Walrus read failed: blob ${blobId} not found on mainnet or testnet`);
 }
 
 export function walrusBlobUrl(blobId: string): string {
@@ -133,12 +218,14 @@ export async function readRegistry(registryBlobId: string): Promise<Registry> {
 
 export async function writeRegistry(registry: Registry): Promise<string> {
   const json = JSON.stringify({ ...registry, updatedAt: new Date().toISOString() });
-  const res = await fetch(`${WALRUS_PUBLISHER}/v1/blobs?epochs=5`, {
-    method: "PUT",
-    body: json,
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!res.ok) throw new Error(`Registry write failed: ${res.status}`);
-  const data = await res.json();
-  return data?.newlyCreated?.blobObject?.blobId || data?.alreadyCertified?.blobId || data?.blobId;
+
+  if (process.env.SUI_PRIVATE_KEY) {
+    try {
+      return await writeToMainnet(json);
+    } catch (e) {
+      console.error("Registry mainnet write failed:", e);
+    }
+  }
+
+  return writeToTestnet(json);
 }
