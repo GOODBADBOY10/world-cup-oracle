@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readMemoryFromWalrus } from "@/lib/walrus";
-import { buildRoastSystemPrompt, buildRoastUserPrompt } from "@/lib/roast";
+import { buildRoastSystemPrompt, buildRoastUserPrompt, recallPredictions } from "@/lib/roast";
 
 async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
   const res = await fetch(
@@ -30,7 +30,9 @@ export async function GET(req: NextRequest) {
     if (!blobId) return NextResponse.json({ error: "Missing blobId" }, { status: 400 });
 
     const memory = await readMemoryFromWalrus(blobId);
-    const text = await callGemini(buildRoastSystemPrompt(), buildRoastUserPrompt(memory));
+    const pastMemories = await recallPredictions(memory.userId);
+    const text = await callGemini(buildRoastSystemPrompt(), buildRoastUserPrompt(memory, pastMemories));
+    // const text = await callGemini(buildRoastSystemPrompt(), buildRoastUserPrompt(memory));
     const roast = JSON.parse(text);
 
     return NextResponse.json({ roast, memory });
