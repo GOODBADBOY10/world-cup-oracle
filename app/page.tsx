@@ -170,6 +170,7 @@ function MatchCard({
         transition: "border-color 0.15s, background 0.15s",
         opacity: isKnown ? 1 : 0.5,
         width: "100%",
+        minWidth: 0,
       }}
       disabled={!isKnown}
     >
@@ -181,18 +182,26 @@ function MatchCard({
           {kickoff.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
         </span>
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
-        <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.9rem" }}>
-          <FlagImg team={match.homeTeam} size={20} /> {match.homeTeam}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "6px", minWidth: 0 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", minWidth: 0 }}>
+          <FlagImg team={match.homeTeam} size={18} />
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {match.homeTeam}
+          </span>
         </span>
-        <span style={{ color: "var(--white-dim)", fontSize: "0.8rem", flexShrink: 0 }}>vs</span>
-        <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.9rem" }}>
-          {match.awayTeam} <FlagImg team={match.awayTeam} size={20} />
+        <span style={{ fontSize: "0.7rem", color: "var(--white-dim)", paddingLeft: "24px" }}>vs</span>
+        <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", minWidth: 0 }}>
+          <FlagImg team={match.awayTeam} size={18} />
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {match.awayTeam}
+          </span>
         </span>
       </div>
-      <p style={{ fontSize: "0.7rem", color: "var(--white-dim)", marginTop: "0.4rem" }}>
+
+      {/* <p style={{ fontSize: "0.7rem", color: "var(--white-dim)", marginTop: "0.5rem" }}>
         📍 {match.city}
-      </p>
+      </p> */}
     </button>
   );
 }
@@ -369,7 +378,7 @@ export default function Home() {
   return (
     <>
       <Nav displayName={displayName} blobId={blobId} />
-      <main style={{ maxWidth: "1100px", margin: "0 auto", padding: "2rem" }}>
+      <main style={{ maxWidth: "1300px", margin: "0 auto", padding: "2rem" }}>
 
         {/* Header */}
         <div style={{ marginBottom: "2rem" }}>
