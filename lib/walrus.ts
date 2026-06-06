@@ -91,34 +91,6 @@ export function computeStats(memory: UserMemory): UserMemory["stats"] {
   return { total: memory.predictions.length, correct: correct.length, streak, bestStreak: best, mostWrongTeam, avgConfidence };
 }
 
-// async function writeToMainnet(json: string): Promise<string> {
-//   const privateKey = process.env.SUI_PRIVATE_KEY;
-//   if (!privateKey) throw new Error("No SUI_PRIVATE_KEY");
-
-//   const { Ed25519Keypair } = await import("@mysten/sui/keypairs/ed25519");
-//   const { SuiClient } = await import("@mysten/sui/client");
-//   const { WalrusClient } = await import("@mysten/walrus");
-
-//   const keypair = Ed25519Keypair.fromSecretKey(privateKey);
-//   const suiClient = new SuiClient({ url: "https://fullnode.mainnet.sui.io:443" });
-
-//   const walrusClient = new WalrusClient({
-//     network: "mainnet",
-//     suiClient,
-//     uploadRelayUrl: "https://upload-relay.mainnet.walrus.space",
-//   });
-
-//   const blob = new TextEncoder().encode(json);
-//   const result = await walrusClient.writeBlob({
-//     blob,
-//     deletable: true,
-//     epochs: 5,
-//     signer: keypair,
-//   });
-
-//   return result.blobId;
-// }
-
 async function writeToMainnet(json: string): Promise<string> {
   const privateKey = process.env.SUI_PRIVATE_KEY;
   if (!privateKey) throw new Error("No SUI_PRIVATE_KEY");
@@ -185,12 +157,6 @@ export async function writeMemoryToWalrus(memory: UserMemory): Promise<string> {
 
   return writeToTestnet(json);
 }
-
-// export async function readMemoryFromWalrus(blobId: string): Promise<UserMemory> {
-//   const res = await fetch(`${WALRUS_AGGREGATOR}/v1/blobs/${blobId}`);
-//   if (!res.ok) throw new Error(`Walrus read failed: ${res.status}`);
-//   return res.json();
-// }
 
 export async function readMemoryFromWalrus(blobId: string): Promise<UserMemory> {
   // Try mainnet first

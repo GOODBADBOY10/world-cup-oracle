@@ -20,7 +20,6 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
   const data = await res.json();
   if (!res.ok) throw new Error(`Gemini error: ${JSON.stringify(data)}`);
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
-  console.log("Gemini raw response:", text);
   return text;
 }
 
